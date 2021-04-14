@@ -7,9 +7,9 @@
   }
 */
 const checkSchemeId = (req, res, next) => {
-  const { id } = req.params;
-  if(!id){
-    res.status(404).json({ message: `scheme with scheme_id ${id} not found` })
+  const { scheme_id } = req.params;
+  if(!scheme_id || scheme_id===""){
+    res.status(404).json({ message: `scheme with scheme_id ${scheme_id} not found` })
   }else{
     next();
   }
