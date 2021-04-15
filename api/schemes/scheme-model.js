@@ -18,20 +18,35 @@ function find() { // EXERCISE A
     Return from this function the resulting dataset.
   */
  return db('schemes')
-    .select("*")
-    .count('steps.step_id', {as: 'number_of_steps'})
     .leftJoin('steps', 'schemes.scheme_id', 'steps.scheme_id')
+    .select("schemes.*")
+    .count('steps.step_id as number_of_steps')
     .groupBy('schemes.scheme_id')
     .orderBy('schemes.scheme_id');
 }
 
-function findById(scheme_id) { // EXERCISE B
-  return db('schemes')
-    .select("sc.scheme_name", "st.*").from("schemes as sc")
+async function findById(scheme_id) { // EXERCISE B
+  const rows = await db('schemes')
+    .select("sc.scheme_name", "st.*", "sc.scheme_id")
     .leftJoin("steps as st", "sc.scheme_id", "st.scheme_id")
     .where("sc.scheme_id", scheme_id)
     .orderBy("st.step_number")
-    
+  const result = {
+    scheme_id: rows[0].scheme_id,
+    scheme_nsmae: rows[0].scheme_name,
+    steps: []
+  }
+  rows.forEach(row => {
+    if(row.step_id) {
+      result.steps.push({
+        step_id: row.step_id,
+        step_number: row.step_number,
+        instructions: row.instructions
+      })
+    }
+  })
+  return result;
+}
   /*
     1B- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`:
 
@@ -97,12 +112,11 @@ function findById(scheme_id) { // EXERCISE B
         "steps": []
       }
   */
-}
 
 function findSteps(scheme_id) { // EXERCISE C
-  return db('schemes')
-    .select("st.step_id", "st.step_number", "st.instructions", "sc.scheme_name").from("schemes as sc")
-    .leftJoin("steps as st", "sc.scheme_id", "st.scheme_id")
+  return db('schemes as sc')
+    .select("st.step_id", "st.step_number", "st.instructions", "sc.scheme_name")
+    .join("steps as st", "sc.scheme_id", "st.scheme_id")
     .where("sc.scheme_id", scheme_id)
     .orderBy("st.step_number")
   /*
@@ -132,12 +146,22 @@ function add(scheme) { // EXERCISE D
     1D- This function creates a new scheme and resolves to _the newly created scheme_.
   */
     return db('schemes').insert(scheme)
+    .then(([scheme_id]) => {
+      return db('schemes').where('scheme_id', scheme_id).first();
+    })
 }
 
 function addStep(scheme_id, step) { // EXERCISE E
   return db('steps')
-  .select("*").from("steps")
-  .insert(step).where("steps.scheme_id", scheme_id)
+  .insert({...step, scheme_id})
+  .then(() => {
+    return db('steps')
+    .join('schemes', 'schemes.scheme_id', 'steps.scheme_id')
+    .select('step_id', 'step_number', 'instructions', 'scheme_name')
+    .where('schemes.scheme_id', scheme_id)
+    .orderBy('step_number')
+  })
+  
   /*
     1E- This function adds a step to the scheme with the given `scheme_id`
     and resolves to _all the steps_ belonging to the given `scheme_id`,
