@@ -1,3 +1,5 @@
+const db = require("../../data/db-config");
+
 function find() { // EXERCISE A
   /*
     1A- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`.
@@ -15,9 +17,36 @@ function find() { // EXERCISE A
     2A- When you have a grasp on the query go ahead and build it in Knex.
     Return from this function the resulting dataset.
   */
+ return db('schemes')
+    .leftJoin('steps', 'schemes.scheme_id', 'steps.scheme_id')
+    .select("schemes.*")
+    .count('steps.step_id as number_of_steps')
+    .groupBy('schemes.scheme_id')
+    .orderBy('schemes.scheme_id');
 }
 
-function findById(scheme_id) { // EXERCISE B
+async function findById(scheme_id) { // EXERCISE B
+  const rows = await db('schemes')
+    .select("sc.scheme_name", "st.*", "sc.scheme_id")
+    .leftJoin("steps as st", "sc.scheme_id", "st.scheme_id")
+    .where("sc.scheme_id", scheme_id)
+    .orderBy("st.step_number")
+  const result = {
+    scheme_id: rows[0].scheme_id,
+    scheme_nsmae: rows[0].scheme_name,
+    steps: []
+  }
+  rows.forEach(row => {
+    if(row.step_id) {
+      result.steps.push({
+        step_id: row.step_id,
+        step_number: row.step_number,
+        instructions: row.instructions
+      })
+    }
+  })
+  return result;
+}
   /*
     1B- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`:
 
@@ -32,7 +61,7 @@ function findById(scheme_id) { // EXERCISE B
 
     2B- When you have a grasp on the query go ahead and build it in Knex
     making it parametric: instead of a literal `1` you should use `scheme_id`.
-
+    
     3B- Test in Postman and see that the resulting data does not look like a scheme,
     but more like an array of steps each including scheme information:
 
@@ -83,9 +112,13 @@ function findById(scheme_id) { // EXERCISE B
         "steps": []
       }
   */
-}
 
 function findSteps(scheme_id) { // EXERCISE C
+  return db('schemes as sc')
+    .select("st.step_id", "st.step_number", "st.instructions", "sc.scheme_name")
+    .join("steps as st", "sc.scheme_id", "st.scheme_id")
+    .where("sc.scheme_id", scheme_id)
+    .orderBy("st.step_number")
   /*
     1C- Build a query in Knex that returns the following data.
     The steps should be sorted by step_number, and the array
@@ -112,9 +145,23 @@ function add(scheme) { // EXERCISE D
   /*
     1D- This function creates a new scheme and resolves to _the newly created scheme_.
   */
+    return db('schemes').insert(scheme)
+    .then(([scheme_id]) => {
+      return db('schemes').where('scheme_id', scheme_id).first();
+    })
 }
 
 function addStep(scheme_id, step) { // EXERCISE E
+  return db('steps')
+  .insert({...step, scheme_id})
+  .then(() => {
+    return db('steps')
+    .join('schemes', 'schemes.scheme_id', 'steps.scheme_id')
+    .select('step_id', 'step_number', 'instructions', 'scheme_name')
+    .where('schemes.scheme_id', scheme_id)
+    .orderBy('step_number')
+  })
+  
   /*
     1E- This function adds a step to the scheme with the given `scheme_id`
     and resolves to _all the steps_ belonging to the given `scheme_id`,
